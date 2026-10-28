@@ -91,6 +91,17 @@ absent "$PUB_ROOT/gone"
 ok help; case "$OUT" in *Usage*) check "help usage" 0 ;; *) check "help usage" 1 ;; esac
 ok; case "$OUT" in *Usage*) check "no-arg usage" 0 ;; *) check "no-arg usage" 1 ;; esac
 
+# publish-html skill: frontmatter valid; every `pub <cmd>` it names is in `pub help`
+SKILL="$HERE/skills/publish-html/SKILL.md"
+[ "$(sed -n 1p "$SKILL" 2>/dev/null)" = "---" ] && grep -qx 'name: publish-html' "$SKILL" && grep -qE '^description: *[^ ]' "$SKILL"
+check "skill frontmatter" $?
+ok help; HELP=$OUT
+cmds=$(grep -oE '\bpub [a-z]+' "$SKILL" 2>/dev/null | cut -d' ' -f2 | sort -u)
+[ -n "$cmds" ]; check "skill names pub commands" $?
+for c in $cmds; do
+  printf '%s\n' "$HELP" | grep -qE "^  $c( |$)"; check "skill command 'pub $c' in help" $?
+done
+
 # errors
 reset
 bad bogus
