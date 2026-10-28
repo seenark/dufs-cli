@@ -1,0 +1,18 @@
+services:
+  dufs:
+    image: sigoden/dufs:latest
+    container_name: dufs
+    restart: unless-stopped
+    ports:
+      # localhost only, reached via Cloudflare tunnel
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - "${PUB_ROOT:-${HOME}/pub}:/data"
+    command:
+      - /data
+      # serve index.html if present, else list files
+      - --render-try-index
+      # allow deleting files
+      - --allow-delete
+      # allow searching files
+      - --allow-search
