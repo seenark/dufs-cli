@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# pub: publish HTML into a folder served at a permanent URL.
+set -euo pipefail
+
+ROOT=${PUB_ROOT:-$HOME/pub}
+BASE=${PUB_URL:-https://read.yourdomain.com}
+BASE=${BASE%/}
+
+usage() {
+  cat <<EOF
+Usage: pub <command> [args]
+  path <slug>              create page folder, print its path
+  add <slug> <file|dir>    publish file (.html/.htm -> index.html) or dir contents; print URL
+  url <slug>               print URL (touches nothing)
+  ls                       list pages, newest first
+  rm <slug>                delete page folder
+  help                     show this help
+Env: PUB_ROOT (default \$HOME/pub), PUB_URL (default https://read.yourdomain.com)
+EOF
+}
+
+die() { echo "pub: $*" >&2; exit 1; }
+
+slugify() {
+  local s
+  s=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9' '-' | tr -s '-')
+  s=${s#-}
+  s=${s%-}
+  [ -n "$s" ] || die "invalid slug: '$1'"
+  printf '%s' "$s"
+}
+
+# slug_arg <cmd> <raw>: validated slug or exit
+slug_arg() { [ -n "${2:-}" ] || die "$1: missing slug"; slugify "$2"; }
+
+cmd=${1:-help}
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  path)
+    slug=$(slug_arg path "${1:-}")
+    mkdir -p "$ROOT/$slug"
+    echo "$ROOT/$slug"
+    ;;
+  add)
+    slug=$(slug_arg add "${1:-}")
+    src=${2:-}
+    [ -n "$src" ] || die "add: missing source"
+    [ -e "$src" ] || die "add: no such file or directory: $src"
+    dest=$ROOT/$slug
+    mkdir -p "$dest"
+    if [ -d "$src" ]; then
+      cp -R "$src"/. "$dest"/
+    else
+      case "$src" in
+        *.[hH][tT][mM][lL] | *.[hH][tT][mM]) cp "$src" "$dest/index.html" ;;
+        *) cp "$src" "$dest/" ;;
+      esac
+    fi
+    echo "$BASE/$slug/"
+    ;;
+  url)
+    slug=$(slug_arg url "${1:-}")
+    echo "$BASE/$slug/"
+    ;;
+  ls)
+    [ -d "$ROOT" ] || exit 0
+    # shortcut: names containing newlines are not handled
+    ls -1t "$ROOT" | while IFS= read -r name; do
+      if [ -d "$ROOT/$name" ]; then printf '%s  %s/%s/\n' "$name" "$BASE" "$name"; fi
+    done
+    ;;
+  rm)
+    slug=$(slug_arg rm "${1:-}")
+    [ -d "$ROOT/$slug" ] || die "rm: no such page: $slug"
+    rm -rf -- "${ROOT:?}/$slug"
+    ;;
+  help | -h | --help) usage ;;
+  *) usage >&2; exit 1 ;;
+esac
